@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {freshRun,act,advance,defaultProgress,parseProgress} from '../src/simulation.mjs';
+function run(){const s=freshRun(1);s.objects=[];s.spawn=1000;return s;}
+test('air duck descends continuously and starts a full slide only on landing',()=>{const s=run();act(s,'jump');for(let i=0;i<20;i++)advance(s);const y=s.y;act(s,'slide');assert.equal(s.y,y);assert.equal(s.slide,0);assert.ok(s.vy<0);advance(s);assert.ok(s.y<y&&s.y>0);for(let i=0;i<60&&s.y>0;i++)advance(s);assert.equal(s.y,0);assert.equal(s.slide,.85);assert.equal(s.duckOnLand,false);});
+test('air duck lands on a roof rather than snapping through it',()=>{const s=run();s.objects=[{id:1,kind:'train',lane:1,z:0,length:24}];s.y=3.06;s.ground=3.06;act(s,'jump');for(let i=0;i<12;i++)advance(s);act(s,'slide');for(let i=0;i<60&&s.vy!==0;i++)advance(s);assert.equal(s.y,3.06);assert.ok(s.slide>0);assert.ok(s.alive);});
+test('saved air duck resumes its descent and Scout keeps longer slide',()=>{const s=run();s.character=4;act(s,'jump');for(let i=0;i<15;i++)advance(s);act(s,'slide');const p=defaultProgress();p.active=s;const restored=parseProgress(JSON.stringify(p)).active;assert.deepEqual(restored,s);while(restored.y>0)advance(restored);assert.equal(restored.slide,1.15);});

@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {freshRun,advance,act,defaultProgress,parseProgress} from '../src/simulation.mjs';import {ROOF} from '../src/surfaces.mjs';
+function setup(objects){const s=freshRun(1);s.objects=objects;s.spawn=1000;return s;}
+test('ramp carries the runner onto a roof then they fall safely off the back',()=>{const s=setup([{id:1,kind:'train',lane:1,z:15},{id:2,kind:'ramp',lane:1,z:5}]);let roof=false;for(let i=0;i<160;i++){advance(s);if(s.y===ROOF)roof=true;assert.ok(s.alive);}assert.ok(roof);assert.equal(s.y,0);});
+test('a well-timed ground jump lands on a train roof',()=>{const s=setup([{id:1,kind:'train',lane:1,z:9}]);act(s,'jump');let landed=false;for(let i=0;i<90;i++){advance(s);if(s.y===ROOF&&s.vy===0)landed=true;assert.ok(s.alive);}assert.ok(landed);});
+test('can jump and slide on the roof without teleporting to the ground',()=>{const s=setup([{id:1,kind:'train',lane:1,z:0}]);s.y=ROOF;s.ground=ROOF;act(s,'slide');assert.equal(s.y,ROOF);act(s,'jump');advance(s);assert.ok(s.y>ROOF);assert.ok(s.alive);});
+test('roof and ramp progress round-trips through save validation',()=>{const p=defaultProgress();p.active=setup([{id:1,kind:'ramp',lane:1,z:-3},{id:2,kind:'train',lane:1,z:7}]);p.active.y=1.02;p.active.ground=1.02;assert.deepEqual(parseProgress(JSON.stringify(p)),p);});
