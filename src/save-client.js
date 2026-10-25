@@ -1,4 +1,4 @@
-/* Garcadium Save Client v1.1.0. Copy into each independent game release. */
+/* Garcadium Save Client v1.2.0. Copy into each independent game release. */
 export class SaveStore {
   constructor(storage, game, accepts) { this.storage=storage;this.game=game;this.accepts=accepts;this.uid=null;this.onchange=()=>{}; }
   prefix(){return `gca:${this.game}:${this.uid}:`;}
@@ -66,7 +66,16 @@ export async function connect(){
  const challenge=btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
  const url=new URL(location.href);url.searchParams.delete('gca_connect');url.hash='';
  sessionStorage.setItem(pendingKey(),JSON.stringify({state,verifier,returnTo:url.pathname+url.search,expires:Date.now()+180000}));
- location.replace(`${PORTAL}/play/${GAME}/?state=${state}&challenge=${challenge}`);
+ if(window.parent!==window){
+  const handoff=await new Promise((resolve,reject)=>{
+   const timeout=setTimeout(()=>{removeEventListener('message',receive);reject(Error('Garcadium account connection timed out.'));},15000);
+   function receive(event){if(event.source!==window.parent||event.origin!==PORTAL||event.data?.type!=='garcadium:handoff'||event.data?.state!==state)return;clearTimeout(timeout);removeEventListener('message',receive);event.data.error?reject(Error(event.data.error)):resolve(event.data);}
+   addEventListener('message',receive);window.parent.postMessage({type:'garcadium:connect',game:GAME,state,challenge},PORTAL);
+  });
+  saveAccount(await api('exchange',{code:handoff.code,state,verifier}));sessionStorage.removeItem(pendingKey());
+  url.searchParams.delete('gca_connect');history.replaceState(null,'',url.pathname+url.search);return true;
+ }
+ location.replace(`${PORTAL}/play/${GAME}/?state=${state}&challenge=${challenge}`);return false;
 }
 function saveAccount(session){account.token=session.token;account.player=session.player;sessionStorage.setItem(tokenKey(),JSON.stringify(session));}
 async function conflict(key){
@@ -120,11 +129,12 @@ export async function initSaves(){
  try{
   if(!nativeStorage)throw Error('Browser storage is unavailable. Enable site storage, then reload to keep progress safe.');
   if(fragment.has('gca_code')){
-   const pending=JSON.parse(sessionStorage.getItem(pendingKey())||'null');
-   history.replaceState(null,'',pending?.returnTo||'/');
-   if(!pending||pending.expires<Date.now()||pending.state!==fragment.get('state'))throw Error('The connection expired. Launch again from Garcadium.');
-   saveAccount(await api('exchange',{code:fragment.get('gca_code'),state:pending.state,verifier:pending.verifier}));sessionStorage.removeItem(pendingKey());
-  }else if(url.searchParams.has('gca_connect')){await connect();return false;}
+   const pending=JSON.parse(sessionStorage.getItem(pendingKey())||'null'),embeddedVerifier=fragment.get('verifier');
+   history.replaceState(null,'',pending?.returnTo||location.pathname+location.search);
+   const exchangeState=pending?.state||fragment.get('state'),exchangeVerifier=pending?.verifier||embeddedVerifier;
+   if(!exchangeVerifier||!exchangeState||pending&&pending.expires<Date.now()||exchangeState!==fragment.get('state'))throw Error('The connection expired. Launch again from Garcadium.');
+   saveAccount(await api('exchange',{code:fragment.get('gca_code'),state:exchangeState,verifier:exchangeVerifier}));sessionStorage.removeItem(pendingKey());
+  }else if(url.searchParams.has('gca_connect')){if(!await connect())return false;}
   else {const stored=JSON.parse(sessionStorage.getItem(tokenKey())||'null');if(stored?.token)saveAccount(stored);}
   if(account.token){status('Restoring your Garcadium save…');
    const manifest=await api('manifest');account.player=manifest.player;
