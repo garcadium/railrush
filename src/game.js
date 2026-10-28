@@ -8,7 +8,7 @@ import {characterPortraits} from './character-model.js?v=20261016-shopfix';
 import {BOARDS,chooseBoard,activateBoard} from './boards.mjs?v=20261016-shopfix';
 import {createWorld} from './render.js?v=20261016-shopfix';
 import {freshRun,act,advance,parseProgress,STEP} from './simulation.mjs?v=20261016-shopfix';
-import {saveStorage} from './save-client.js?v=20261016-shopfix';
+import {saveStorage} from './save-client.js?v=1.2.2';
 const $=id=>document.getElementById(id),KEY='railrush-progress-v1';
 export async function boot(initSaves){
  const music=new Soundtrack();const world=createWorld($('world'));let mode='menu',state=freshRun(842),progress,ready=false,acc=0,last=performance.now(),visual=0,lastSave=0,toastTimer,audio,sessionEnded=false,catchElapsed=0,runOpen=false;
