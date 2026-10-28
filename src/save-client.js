@@ -1,4 +1,4 @@
-/* Garcadium Save Client v1.2.0. Copy into each independent game release. */
+/* Garcadium Save Client v1.2.1. Copy into each independent game release. */
 export class SaveStore {
   constructor(storage, game, accepts) { this.storage=storage;this.game=game;this.accepts=accepts;this.uid=null;this.onchange=()=>{}; }
   prefix(){return `gca:${this.game}:${this.uid}:`;}
@@ -59,10 +59,14 @@ async function api(op,data={}){
  let body;try{body=await res.json();}catch{throw Error('Garcadium could not be reached. Your browser copy is retained.');}
  if(!res.ok)throw Object.assign(Error(body.error||'Saving is unavailable.'),{status:res.status});lastValidated=started;return body;
 }
+function portalGame(){return typeof PORTAL_GAME==='string'&&PORTAL_GAME?PORTAL_GAME:GAME;}
+export function createAccount(){
+ const game=portalGame(),returnTo=`${PORTAL}/play/${game}/`;
+ if(window.parent!==window){window.parent.postMessage({type:'garcadium:open-account',game},PORTAL);return;}
+ location.assign(`${PORTAL}/join/?return_to=${encodeURIComponent(returnTo)}`);
+}
 export async function connect(){
- // Offline files and alternate hosts continue through the canonical online game.
- if(!/\.onrender\.com$/i.test(location.hostname)){location.assign(`${PORTAL}/play/${GAME}/`);return;}
- const state=hex(),verifier=hex();const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)));
+const state=hex(),verifier=hex();const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)));
  const challenge=btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
  const url=new URL(location.href);url.searchParams.delete('gca_connect');url.hash='';
  sessionStorage.setItem(pendingKey(),JSON.stringify({state,verifier,returnTo:url.pathname+url.search,expires:Date.now()+180000}));
@@ -75,6 +79,7 @@ export async function connect(){
   saveAccount(await api('exchange',{code:handoff.code,state,verifier}));sessionStorage.removeItem(pendingKey());
   url.searchParams.delete('gca_connect');history.replaceState(null,'',url.pathname+url.search);return true;
  }
+ if(window.parent===window&&(!GAME_ORIGIN||location.origin!==GAME_ORIGIN)&&!/\.onrender\.com$/i.test(location.hostname)){location.assign(`${PORTAL}/play/${portalGame()}/`);return false;}
  location.replace(`${PORTAL}/play/${GAME}/?state=${state}&challenge=${challenge}`);return false;
 }
 function saveAccount(session){account.token=session.token;account.player=session.player;sessionStorage.setItem(tokenKey(),JSON.stringify(session));}
@@ -147,7 +152,7 @@ export async function initSaves(){
    const menu=document.createElement('details'),summary=document.createElement('summary'),out=document.createElement('button');summary.textContent='Player';out.textContent=`Sign out of ${GAME_NAME}`;
    out.onclick=async()=>{await flush();if(Object.values(saveStorage.meta()).some(m=>m.dirty)){status('Save pending · retry before signing out');return;}sessionStorage.removeItem(tokenKey());location.replace('/');};menu.append(summary,out);bar.append(menu);
   }else{
-   if(['localhost','127.0.0.1'].includes(location.hostname)){action('',connect);}else{action('Connect account',connect);}
+   action('Create online account',createAccount);
    account.ageBand=nativeStorage.getItem('garcadium-guest-age');
    if(account.ageBand==='under13'){status('A parent-managed Garcadium profile is required.');action('Use my Garcadium account',connect);return false;}
    if(!['13-17','18+'].includes(account.ageBand)){
