@@ -1,4 +1,4 @@
-/* Garcadium Save Client v1.2.1. Copy into each independent game release. */
+/* Garcadium Save Client v1.2.2. Copy into each independent game release. */
 export class SaveStore {
   constructor(storage, game, accepts) { this.storage=storage;this.game=game;this.accepts=accepts;this.uid=null;this.onchange=()=>{}; }
   prefix(){return `gca:${this.game}:${this.uid}:`;}
@@ -37,6 +37,30 @@ export const saveStorage=typeof window==='undefined'?{
 }:new SaveStore(nativeStorage,GAME,allowed);
 export const account={player:null,token:null,ageBand:null,status:'Guest · saved in this browser'};
 const PORTAL='https://garcadium.com';
+function applyEmbeddedBranding(){
+ const embedded=typeof window!=='undefined'&&window.parent!==window;
+ if(typeof document==='undefined')return;
+ document.documentElement.toggleAttribute('data-garcadium-embedded',embedded);
+ if(!document.getElementById('gca-embedded-brand-style')){
+  const style=document.createElement('style');style.id='gca-embedded-brand-style';
+  style.textContent='html[data-garcadium-embedded] [data-garcadium-standalone-brand]{display:none!important}';
+  (document.head||document.documentElement).append(style);
+ }
+ if(!embedded)return;
+ const markStandaloneBrand=()=>{
+  for(const link of document.querySelectorAll('a[href]')){
+   let url;try{url=new URL(link.getAttribute('href'),location.href);}catch{continue;}
+   if(url.origin!==PORTAL||link.closest('.gca-savebar,#gca-save-bar,[data-garcadium-save-bar]'))continue;
+   const label=[link.textContent,link.getAttribute('aria-label'),...Array.from(link.querySelectorAll('img[alt]'),image=>image.alt)].filter(Boolean).join(' ');
+   if(!/\bgarcadium\b/i.test(label)||/^\s*(?:←|back\b)/i.test(label))continue;
+   const rect=link.getBoundingClientRect();if(rect.bottom<0||rect.top>180)continue;
+   link.setAttribute('data-garcadium-standalone-brand','');
+  }
+ };
+ const start=()=>{markStandaloneBrand();const observer=new MutationObserver(markStandaloneBrand);observer.observe(document.body,{childList:true,subtree:true});setTimeout(()=>observer.disconnect(),15000);};
+ document.readyState==='loading'?document.addEventListener('DOMContentLoaded',start,{once:true}):start();
+}
+applyEmbeddedBranding();
 const GAME_ORIGIN=typeof location==='undefined'?'':location.origin;
 const GAME_NAME={luminera:'Luminera',pocketvalley:'Pocket Valley',morsel:'Morsel',oddly:'Oddly',gloopy:'Gloopy',slipstream:'Slipstream',railrush:'Railrush'}[GAME]||GAME;
 let bar,statusNode,actionNode,timer,running=false,blocked=false,sessionEnded=false,lastValidated=0,lastCheckAttempt=0,checking=false;
